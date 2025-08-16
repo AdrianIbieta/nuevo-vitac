@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VITAC — Visualizador de tallas + capturas + sA</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{ --bg:#0b1020; --panel:#111833; --panel2:#0f172a; --text:#e6edf3; --muted:#92a0b3; --accent:#38bdf8; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial; overflow:hidden;}
+  .app{display:grid;grid-template-columns: 3fr 1fr;grid-template-rows: 68px 1fr;gap:8px;height:100dvh;padding:8px;min-height:0}
+  header{grid-column:1/3;display:grid;grid-template-columns: max-content 1fr max-content;gap:8px;align-items:center;min-height:0}
+  .logo{display:flex;gap:8px;align-items:center;min-width:0}
+  .logo .sym{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#2563eb,#06b6d4)}
+  .logo h1{font-size:16px;margin:0;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:clip}
+  .uploader{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0; justify-content:flex-end; justify-self:end; text-align:right;}
+  .uploader label{background:var(--panel);border:1px solid #1f2a4a;color:var(--text);padding:4px 8px;border-radius:10px;font-size:12px;display:flex;gap:6px;align-items:center;white-space:nowrap}
+  .uploader input{display:none}
+  .pill{background:#1e293b;border:1px solid #334155;border-radius:999px;padding:3px 8px;color:#cbd5e1;font-size:12px;white-space:nowrap}
+  .main{display:grid;grid-template-columns: 1fr;grid-template-rows: 78px 1fr;gap:8px;min-height:0}
+  .lances{background:var(--panel2);border:1px solid #1e293b;border-radius:12px;padding:6px 8px;display:flex;flex-wrap:nowrap;gap:10px;align-items:center;min-height:0;overflow:hidden}
+  .sec{display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  .sec .lbl{font-size:12px;color:#9fb1c5}
+  .flexwrap{display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:40vw;overflow:hidden}
+  .sep{width:1px;height:26px;background:#23304f;flex:0 0 auto}
+  .btn{border:1px solid #334155;background:#0b1226;color:#cbd5e1;border-radius:10px;padding:5px 8px;font-size:12px;cursor:pointer}
+  .btn:hover{border-color:#4b5563}
+  .btn.active{background:#172554;color:white;border-color:currentColor}
+  .btn.badge{pointer-events:none}
+  .btn.small{padding:4px 6px;font-size:12px}
+  .grid{display:grid;grid-template-columns: 1fr 1fr;grid-template-rows: 1fr 1fr;gap:8px;height:100%;min-height:0}
+  .card{background:var(--panel2);border:1px solid #1e293b;border-radius:12px;padding:8px;display:flex;flex-direction:column;min-height:0}
+  .card h3{margin:0 0 4px 0;font-size:13px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:clip;display:flex;gap:8px;align-items:center}
+  .inline{display:inline-flex;gap:6px;align-items:center}
+  .tiny-input{height:22px; padding:2px 6px; font-size:12px; width:64px; border-radius:8px; border:1px solid #334155; background:#0b1226; color:#e5e7eb}
+  .range{accent-color:#38bdf8}
+  .card .inner{flex:1;min-height:0;position:relative}
+  canvas{width:100% !important;height:100% !important}
+  #map{height:100%;min-height:560px;border-radius:12px;flex:1 1 auto}
+  .mapwrap{grid-column:2/3;grid-row:2/4;background:var(--panel2);border:1px solid #1e293b;border-radius:12px;padding:8px;display:flex;flex-direction:column;min-height:560px}
+  .maphead{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .eq{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;font-size:12px;color:#9fb1c5;white-space:nowrap;overflow:hidden;text-overflow:clip}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;overflow:auto;max-height:64px}
+  .legend .key{display:flex;gap:6px;align-items:center;font-size:12px;color:#cbd5e1}
+  .legend .sw{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid #1e293b}
+  .seg{display:inline-flex;border:1px solid #334155;border-radius:10px;overflow:hidden}
+  .seg button{background:#0b1226;border:0;padding:4px 8px;font-size:12px;color:#cbd5e1;cursor:pointer}
+  .seg button.active{background:#172554;color:white}
+  .ctrls{display:flex;gap:6px;align-items:center;flex-wrap:nowrap; overflow-x:auto;}
+  .ctrl{display:flex;gap:6px;align-items:center;background:#0b1226;border:1px solid #334155;border-radius:10px;padding:4px 8px;font-size:12px;color:#cbd5e1}
+  #status{white-space:nowrap}
+  @media (max-width: 1100px){
+    .app{grid-template-columns:1fr;grid-template-rows:68px auto auto}
+    .mapwrap{grid-column:1/2;grid-row:auto}
+    .grid{grid-template-columns:1fr;grid-template-rows:repeat(3, 300px)}
+  }
+
+  /* Etiqueta fija para lances */
+  .leaflet-tooltip.lance-tip{
+    background: rgba(15, 23, 42, 0.92); /* dark navy */
+    color: #e2e8f0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    box-shadow: none;
+  }
+
+
+  .logo .bigV{
+    width:56px;height:56px;border-radius:14px;
+    background:linear-gradient(135deg,#2563eb,#06b6d4);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:34px;color:#fff;letter-spacing:-1px;
+    box-shadow:0 6px 20px rgba(0,0,0,.25);
+  }
+  .logo h1{font-size:16px;margin:0;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:clip}
+  .logo .subtitle{color:#9fb1c5;font-weight:500}
+
+  .center-tools{display:flex; align-items:center; justify-content:center}
+  .iconbtn{background:#102040;border:1px solid #1f2a44;color:#cbd5e1;border-radius:10px;padding:6px 10px;cursor:pointer;font-weight:700}
+  .iconbtn:hover{border-color:#334155}
+  /* Modal */
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9999}
+  .modal{background:#0f172a; border:1px solid #1f2a44; border-radius:12px; width:min(920px,96vw); max-height:90vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .modal header{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #1f2a44}
+  .modal header h2{margin:0; font-size:16px}
+  .modal .content{padding:16px; font-size:14px; color:#cbd5e1}
+  .modal .cols{display:grid; grid-template-columns: 1fr 1fr; gap:16px}
+  .modal .code{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; background:#0d1530; border:1px solid #1a2744; padding:2px 6px; border-radius:6px; color:#9fb1c5; display:inline-block}
+  .modal .footer{padding:12px 16px; border-top:1px solid #1f2a44; display:flex; gap:8px; justify-content:flex-end}
+  .btn.ghost{background:transparent; border:1px solid #1f2a44}
+  @media (max-width: 800px){ .modal .cols{grid-template-columns: 1fr;} }
+
+  .helpbar{display:flex; align-items:center; justify-content:flex-end}
+  .iconbtn{background:#102040;border:1px solid #1f2a44;color:#cbd5e1;border-radius:10px;padding:6px 10px;cursor:pointer;font-weight:700}
+  .iconbtn:hover{border-color:#334155}
+  .modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:9999}
+  .modal{background:#0f172a; border:1px solid #1f2a44; border-radius:12px; width:min(920px,96vw); max-height:90vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  .modal header{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid #1f2a44}
+  .modal header h2{margin:0; font-size:16px}
+  .modal .content{padding:16px; font-size:14px; color:#cbd5e1}
+  .modal .cols{display:grid; grid-template-columns: 1fr 1fr; gap:16px}
+  .modal .code{font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; background:#0d1530; border:1px solid #1a2744; padding:2px 6px; border-radius:6px; color:#9fb1c5; display:inline-block}
+  .modal .footer{padding:12px 16px; border-top:1px solid #1f2a44; display:flex; gap:8px; justify-content:flex-end}
+  .btn.ghost{background:transparent; border:1px solid #1f2a44}
+  @media (max-width: 800px){ .modal .cols{grid-template-columns: 1fr;} }
+
+  .modal .code.light{display:block; padding:6px 8px; margin:8px 0; border-radius:8px}
+  .modal details.lite{margin-top:6px}
+  .modal details.lite summary{cursor:pointer; color:#cbd5e1; list-style:none}
+  .modal details.lite summary::-webkit-details-marker{display:none}
+  .modal details.lite summary:before{content:"▸ "; color:#94a3b8}
+  .modal details.lite[open] summary:before{content:"▾ ";}
+  .modal .syns{margin-top:8px; color:#9fb1c5}
+  .modal .cols ul{margin:6px 0 10px 18px}
+
+  #ptCtl{margin-left:8px}
+  #ptInput{width:48px;text-align:center}
+
+  .card.double .inner + .inner{margin-top:6px}
+
+/* Split sex/EMS horizontally */
+.card.double .split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  align-items:stretch;
+}
+@media(max-width: 960px){
+  .card.double .split{ grid-template-columns:1fr; }
+}
+
+
+/* Compact EMS chart height so header/meta is visible */
+#emsChart{ height:220px !important; width:100% !important; margin-top:8px; }
+
+
+/* Improve header spacing and position EMS lower */
+.card.double{ padding-top:10px; }
+.card.double h3{ margin:0 0 8px; line-height:1.2; }
+.card.double .split{ align-items:end; }
+/* Slightly smaller EMS to avoid clipping header */
+#emsChart{ height:210px !important; width:100% !important; margin-top:4px; }
+
+
+/* --- EMS header/height tidy --- */
+.card.double h3{ overflow: visible !important; margin-bottom: 10px !important; }
+.card.double .split{ grid-template-columns: 1fr 1fr !important; align-items: end !important; margin-top: 13px !important; }
+#emsChart{ height: 200px !important; width:100% !important; margin-top: 6px !important; }
+
+
+/* Keep info under charts inside the card and slightly enlarge EMS */
+.card.double{ padding-bottom: 14px !important; }
+.card.double .split{ align-items: end !important; }
+#emsChart, #sexChart{ height: 230px !important; width: 100% !important; }
+
+
+/* === EMS height tuner === (v2) */
+:root{ --ems-h: 230px; } /* default */
+#emsChart, #sexChart{ height: var(--ems-h) !important; width: 100% !important; }
+.card.double .tinyctrl{
+  font-size: 12px; color:#cbd5e1; display:flex; gap:8px; align-items:center;
+  justify-content:flex-end; margin:2px 0 6px;
+}
+.card.double .tinyctrl input[type="range"]{ width: 200px; }
+.card.double .tinyctrl .val{ font-variant-numeric: tabular-nums; min-width: 44px; text-align:right; }
+
+
+/* Remove tuner UI and fix heights */
+#emsHTuner{ display:none !important; }
+#emsChart, #sexChart{ height:230px !important; width:100% !important; }
+
+
+/* === Proporción sexual: más espacio arriba y gráficos más abajo === */
+.card.double{ padding-top: 12px !important; padding-bottom: 14px !important; }
+.card.double h3{ margin: 0 0 16px !important; line-height: 1.25 !important; overflow: visible !important; }
+.card.double .split{ margin-top: 13px !important; align-items: end !important; }
+/* Altura coherente de ambos gráficos (ajusta si quieres) */
+#emsChart, #sexChart{ height: 230px !important; width: 100% !important; }
+
+
+/* === Proporción sexual: layout balanceado y responsive === */
+.card.double{ padding-top: 12px !important; padding-bottom: 16px !important; }
+.card.double h3{ margin: 0 0 16px !important; line-height: 1.25 !important; overflow: visible !important; }
+.card.double .split{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: end !important;
+  margin-top: 14px !important;
+}
+#emsChart, #sexChart{
+  height: 230px !important;   /* altura cómoda por defecto */
+  width: 100% !important;
+  display: block;
+}
+@media (max-width: 960px){
+  .card.double .split{ grid-template-columns: 1fr; margin-top: 12px !important; }
+  #emsChart, #sexChart{ height: 200px !important; }  /* un poco más compactos en pantallas chicas */
+}
+
+
+/* --- Capturas table (3 especies) --- */
+.tbl.small{ font-size: 13px; margin: 6px 0 4px; }
+.tbl.small table{ width:100%; border-collapse: collapse; }
+.tbl.small th, .tbl.small td{ text-align:left; padding: 4px 6px; border-bottom: 1px solid rgba(148,163,184,0.2); }
+.tbl.small th:last-child, .tbl.small td:last-child{ text-align: right; }
+
+
+/* --- Capturas responsive split (table + donut) --- */
+.card .split.cap{
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 8px;
+}
+.card .split.cap .inner{ min-height: 0; }
+.card .split.cap .captable{ overflow:auto; }
+.card .split.cap .capchart canvas#capChart{ height: 230px !important; width: 100% !important; display:block; }
+@media (max-width: 960px){
+  .card .split.cap{ grid-template-columns: 1fr; }
+}
+
+
+/* Capturas 50/50 y centrados */
+.card .split.cap .inner{ display:flex; align-items:center; justify-content:center; }
+.card .split.cap .captable .tbl.small table{ max-width: 420px; margin: 0 auto; }
+.card .split.cap .capchart canvas#capChart{ display:block; margin: 0 auto; }
+
+
+/* Capturas: volver a layout simple (sin split cap) */
+.card .split.cap{ display:block !important; grid-template-columns: none !important; gap:0 !important; }
+.card .split.cap .inner{ display:block !important; }
+#capTableWrap{ display:none !important; } /* ocultar tabla */
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo"><div class="bigV">V</div><h1>VITAC<br><span class="subtitle">Visualizador de tallas + capturas + sA</span></h1></div>
+<div class="uploader">
+      <label>📄 Sábana<input type="file" id="fileSabana" accept=".csv"></label>
+      <label>🧭 Lances<input type="file" id="fileLances" accept=".csv"></label>
+      <label>🪪 Biometría<input type="file" id="fileBiom" accept=".csv"></label>
+      <label>🎣 Capturas<input type="file" id="fileCap" accept=".csv"></label>
+      <span id="status" class="pill">0/4 · Esperando archivos…</span>
+      <div class="helpbar"><button id="btnHelp" class="iconbtn" title="Ayuda">?</button></div>
+  </header>
+
+  <section class="main">
+    <div class="lances" id="lanceBar">
+      <div class="sec"><span class="lbl">Especie:</span><div id="speciesBtns" class="flexwrap"></div></div>
+      <div class="sep"></div>
+      <h3>Lances:</h3>
+      <button class="btn small" id="btnTodos">Todos</button>
+      <button class="btn small" id="btnClear">Limpiar</button>
+      <button class="btn small" id="btnMulti" title="Seleccionar más de un lance">Multi OFF</button>
+      <div id="lanceBtns" class="flexwrap"></div>
+      <span class="btn badge" id="selCount">0 sel.</span>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <h3>
+          Frecuencia de tallas
+          <span id="freqMeta" class="eq"></span>
+          <span class="inline">
+            <span class="pill">Bin (cm)</span>
+            <input id="binInput" class="tiny-input" type="number" step="0.5" min="0.1" value="1">
+          </span>
+          <button class="btn small" id="freqModeBtn" title="Alternar línea/barra">Barras</button>
+        </h3>
+        <div class="inner"><canvas id="freqChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Dispersión Longitud–Peso <span id="regMeta" class="eq"></span></h3>
+        <div class="inner"><canvas id="scatterChart"></canvas></div>
+      </div>
+            <div class="card">
+        <h3>Capturas por especie <span id="capMeta" class="eq"></span></h3>
+        <div class="inner"><canvas id="capChart"></canvas></div>
+      </div>
+<div class="card double">
+        <h3>Proporción sexual <span id="sexMeta" class="eq"></span></h3>
+        <div class="split">
+          <div class="inner"><canvas id="emsChart"></canvas></div>
+          <div class="inner"><canvas id="sexChart"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="mapwrap">
+    <div class="maphead">
+      <h3>Mapa Sábana (Lat_M/Lon_M) <span id="mapMeta" class="eq"></span></h3>
+      <div class="ctrls">
+        <button class="btn small" id="toggleSabana" title="Mostrar/ocultar Sábana">Ocultar Sábana</button>
+        <div class="seg" id="metricSeg">
+          <button data-m="NASC" class="active" title="NASC_mezcla_MS.MC">NASC mezcla</button>
+          <button data-m="AUS" title="sA_Merluza_Austral">sA M. Austral</button>
+          <button data-m="COL" title="sA_Merluza_Cola">sA M. Cola</button>
+        </div>
+        <span class="inline" id="ptCtl"><span class="pill">Punto</span><input id="ptInput" class="tiny-input" type="number" min="1" max="9" step="1" value="3"></span>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="legend" id="mapLegend"></div>
+  </aside>
+</div>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js">
+
+// === EMS height tuner logic (improved) ===
+(function(){
+  const r = qs("#emsHRange");
+  const val = qs("#emsHVal");
+  const root = document.documentElement;
+  const emsCv = qs("#emsChart");
+  const sexCv = qs("#sexChart");
+  const apply = (px)=>{
+    root.style.setProperty("--ems-h", px + "px");
+    if (emsCv){ emsCv.style.height = px + "px"; emsCv.height = px; }
+    if (sexCv){ sexCv.style.height = px + "px"; sexCv.height = px; }
+    if (window.state && state.charts){
+      const c1 = state.charts["#emsChart"]; if (c1 && c1.resize) c1.resize();
+      const c2 = state.charts["#sexChart"]; if (c2 && c2.resize) c2.resize();
+    } else {
+      // Fallback: window resize for Chart.js auto-resizer
+      window.dispatchEvent(new Event("resize"));
+    }
+  };
+  if (!r || !val) return;
+  let saved = localStorage.getItem("emsHeightPx_disabled");
+  let px = saved? Math.max(160, Math.min(360, parseInt(saved,10)||230)) : 230;
+  r.value = px; val.textContent = px; apply(px);
+  r.addEventListener("input", () => { px = parseInt(r.value, 10); val.textContent = px; localStorage.setItem("emsHeightPx_disabled", String(px)); apply(px); });
+})();
+
+(function(){
+  const r = qs("#emsHRange");
+  const val = qs("#emsHVal");
+  const root = document.documentElement;
+  if (!r || !val) return;
+  let saved = localStorage.getItem("emsHeightPx_disabled");
+  if (saved){
+    saved = Math.max(160, Math.min(360, parseInt(saved,10)||230));
+    root.style.setProperty("--ems-h", saved + "px");
+    r.value = saved;
+    val.textContent = saved;
+    setTimeout(()=> window.dispatchEvent(new Event("resize")), 50);
+  } else {
+    r.value = 230; val.textContent = 230;
+  }
+  r.addEventListener("input", () => {
+    const px = parseInt(r.value, 10);
+    root.style.setProperty("--ems-h", px + "px");
+    val.textContent = px;
+    localStorage.setItem("emsHeightPx_disabled", String(px));
+    // Nudge charts to resize responsively
+    window.dispatchEvent(new Event("resize"));
+  });
+})();
+
+window.addEventListener("resize", ()=>{ try{ state.map && state.map.invalidateSize(); }catch(e){} });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+/*** Helpers ***/
+const qs = sel => document.querySelector(sel);
+const qsa = sel => Array.from(document.querySelectorAll(sel));
+const fmt = new Intl.NumberFormat('es-CL');
+const fmt1 = (v) => (v==null || !isFinite(v) ? "—" : fmt.format(Math.round(v)));
+const fmt1d = (v) => (v==null || !isFinite(v) ? "—" : (Math.round(v*10)/10).toFixed(1));
+const fmt2d = (v) => (v==null || !isFinite(v) ? "—" : (Math.round(v*100)/100).toFixed(2));
+const fmt3d = (v) => (v==null || !isFinite(v) ? "—" : (Math.round(v*1000)/1000).toFixed(3));
+const fmt4d = (v) => (v==null || !isFinite(v) ? "—" : (Math.round(v*10000)/10000).toFixed(4));
+function toNum(v){ const x=parseFloat(String(v).replace(",", ".")); return Number.isFinite(x)? x: NaN; }
+
+// Class colors
+const COLORS = { gray:"#94a3b8", yellow:"#fbbf24", green:"#22c55e", blue:"#3b82f6", red:"#ef4444" };
+function classColor(v){
+  if (!isFinite(v) || v<=0) return COLORS.gray;
+  if (v <= 640) return COLORS.yellow;
+  if (v <= 1280) return COLORS.green;
+  if (v <= 2560) return COLORS.blue;
+  return COLORS.red;
+}
+const PALETTE = ["#e11d48","#f59e0b","#10b981","#3b82f6","#a855f7","#ef4444","#14b8a6","#84cc16","#06b6d4","#f97316","#22c55e","#8b5cf6","#0ea5e9","#d946ef"];
+const lanceColor = (id) => { const n = Number(id); return Number.isFinite(n) ? PALETTE[(n-1)%PALETTE.length] : "#64748b"; }
+
+/*** State ***/
+let __INIT_ONCE__ = false;
+const state = {
+  sabana:null, lances:null, biom:null, cap:null,
+  selectedSpecies:null, selectedLances:new Set(), multi:false,
+  sabanaMetric:"NASC", showSabana:true, // "NASC" | "AUS" | "COL"
+  sabanaRadius:3,
+  map:null, sabanaLayer:null, lancesLayer:null, charts:{},
+  mapFitted:false,
+  binStep:1,
+  freqMode:'line'
+};
+const loaded = { sab:false, lan:false, bio:false, cap:false };
+
+function setStatus(){
+  const needOK = (loaded.lan && loaded.bio && loaded.cap);
+  const missing = [];
+  if (!loaded.lan) missing.push("Lances");
+  if (!loaded.bio) missing.push("Biometría");
+  if (!loaded.cap) missing.push("Capturas");
+  if (!loaded.sab) missing.push("Sábana (opcional)");
+  const count = (loaded.lan?1:0)+(loaded.bio?1:0)+(loaded.cap?1:0)+(loaded.sab?1:0);
+  const txt = needOK ? (loaded.sab ? "Listo" : "Listo (sin Sábana)") : ("Falta: " + missing.join(", "));
+  const st = qs("#status"); if (st) st.textContent = `${count}/4 · ${txt}`;
+  if (needOK && !__INIT_ONCE__){ __INIT_ONCE__ = true; initAfterData(); }
+}
+
+/*** Normalizadores ***/
+function normalizeSabana(rows){
+  return rows.map(r=>{
+    const Lance=r["Lance"] ?? r["lance"] ?? r["ID_Lance"] ?? r["id_lance"];
+    const Lat_M=r["Lat_M"] ?? r["lat_m"] ?? r["Lat M"];
+    const Lon_M=r["Lon_M"] ?? r["lon_m"] ?? r["Lon M"];
+    const NASC=r["NASC_mezcla_MS.MC"] ?? r["NASC_mezcla_MS_MC"] ?? r["NASC"] ?? r["nasc"];
+    const sA_Aus=r["sA_Merluza_Austral"] ?? r["sA_Merluza_Aus"] ?? r["sA_Austral"];
+    const sA_Cola=r["sA_Merluza_Cola"] ?? r["sA_Cola"];
+    const UBM=r["UBM"] ?? r["ubm"];
+    return {
+      _Lance: Lance!==undefined ? Number(Lance) : null,
+      _LatM: toNum(Lat_M), _LonM: toNum(Lon_M),
+      _NASC: toNum(NASC), _sA_Aus: toNum(sA_Aus), _sA_Cola: toNum(sA_Cola),
+      _UBM: UBM!==undefined ? Number(UBM) : null
+    };
+  }).filter(r=> Number.isFinite(r._LatM) && Number.isFinite(r._LonM) && Number.isFinite(r._Lance));
+}
+function normalizeLances(rows){
+  return rows.map(r=>({lance_id:Number(r["lance_id"] ?? r["Lance"] ?? r["id_lance"]), fecha:r["fecha"] ?? r["Fecha"] ?? "", lat:toNum(r["lat"] ?? r["Lat_M"] ?? r["Lat"]), lon:toNum(r["lon"] ?? r["Lon_M"] ?? r["Lon"])})).filter(r=>Number.isFinite(r.lance_id));
+}
+function normalizeBiom(rows){
+  return rows.map(r=>({lance_id:Number(r["lance_id"] ?? r["Lance"] ?? r["id_lance"]), especie:String(r["especie"] ?? r["Species"] ?? r["species"] ?? "").trim(), longitud_cm:toNum(r["longitud_cm"] ?? r["long_cm"] ?? r["longitud"] ?? r["talla_cm"]), peso_g:toNum(r["peso_g"] ?? r["peso"] ?? r["weight_g"]), sexo:Number(r["sexo"] ?? r["sex"]), Ems:Number(r["Ems"] ?? r["ems"] ?? r["madurez"]), fecha:r["fecha"] ?? r["Fecha"] ?? "", lat:toNum(r["lat"]), lon:toNum(r["lon"])})).filter(r=>Number.isFinite(r.lance_id));
+}
+function normalizeCap(rows){
+  return rows.map(r=>({lance_id:Number(r["lance_id"] ?? r["Lance"] ?? r["id_lance"]), especie:String(r["especie"] ?? r["Species"] ?? r["species"] ?? "").trim(), captura_kg:toNum(r["captura_kg"] ?? r["captura_k"] ?? r["captura"])})).filter(r=>Number.isFinite(r.lance_id));
+}
+
+/*** Init after all loaded ***/
+function initAfterData(){
+  // Especies
+  const sppSet = new Set(state.biom.map(d=>d.especie).filter(Boolean));
+  const species = [...sppSet].sort();
+  state.selectedSpecies = species[0] || null;
+  applySpeciesDefaultBinFromName(state.selectedSpecies);
+  const sb = qs("#speciesBtns"); sb.innerHTML="";
+  species.forEach(s=>{
+    const b=document.createElement("button");
+    b.className="btn small"; b.textContent=s;
+    b.onclick = ()=>{ state.selectedSpecies=s; updateSpeciesButtons(); redrawAll(); };
+    sb.appendChild(b);
+  });
+  updateSpeciesButtons();
+
+  // Bin input
+  const binInput = qs("#binInput");
+  const applyBin = ()=>{
+    const v = parseFloat(binInput.value);
+    state.binStep = (isFinite(v) && v>0) ? v : 1;
+    binInput.value = state.binStep;
+    redrawAll();
+  };
+  binInput.addEventListener("change", applyBin);
+  binInput.addEventListener("keyup", (e)=>{ if (e.key==="Enter") applyBin(); });
+
+  // Toggle frecuencia modo
+  const fmb = qs("#freqModeBtn");
+  function updateFMB(){ if(!fmb) return; fmb.textContent = (state.freqMode==="bar" ? "Línea" : "Barras"); }
+  if (fmb){ fmb.onclick = ()=>{ state.freqMode = (state.freqMode==="bar" ? "line" : "bar"); updateFMB(); redrawAll(); }; updateFMB(); }
+
+  // Lances
+  const uniq=[...new Set(state.lances.map(d=>d.lance_id))].sort((a,b)=>a-b);
+  const lb = qs("#lanceBtns"); lb.innerHTML="";
+  uniq.forEach(id=>{
+    const b=document.createElement("button");
+    b.className="btn"; b.textContent=id; b.style.borderColor="#334155";
+    b.onclick = ()=>{
+      if (!state.multi) state.selectedLances.clear();
+      if (state.selectedLances.has(id)) state.selectedLances.delete(id); else state.selectedLances.add(id);
+      updateLanceButtons(); redrawAll();
+    };
+    lb.appendChild(b);
+  });
+  qs("#btnTodos").onclick = ()=>{ state.selectedLances = new Set(uniq); updateLanceButtons(); redrawAll(); };
+  qs("#btnClear").onclick = ()=>{ state.selectedLances = new Set(); updateLanceButtons(); redrawAll(); };
+
+  // Multi button
+  const bm = qs("#btnMulti");
+  function updateMultiBtn(){ bm.classList.toggle("active", state.multi); bm.textContent = state.multi? "Multi ON" : "Multi OFF"; }
+  bm.onclick = ()=>{
+    state.multi = !state.multi;
+    if(!state.multi && state.selectedLances.size>1){
+      const first=state.selectedLances.values().next().value;
+      state.selectedLances = new Set([first]);
+    }
+    updateMultiBtn();
+  // Sábana opcional: ocultar controles si no hay datos
+  if (!state.sabana || !state.sabana.length){
+    state.showSabana = false;
+    const tgsEl = qs("#toggleSabana"); if (tgsEl) tgsEl.style.display = "none";
+    const segEl = qs("#metricSeg"); if (segEl) segEl.style.display = "none";
+    const ptCtlEl = qs("#ptCtl"); if (ptCtlEl) ptCtlEl.style.display = "none";
+    const headH3 = qs(".maphead h3"); if (headH3) headH3.textContent = "Mapa (Sábana opcional)";
+    const meta = qs("#mapMeta"); if (meta) meta.textContent = "— (Sábana no cargada · opcional)";
+    const legend = qs("#mapLegend"); if (legend) legend.innerHTML = "";
+  } updateLanceButtons(); redrawAll();
+  };
+  updateMultiBtn();
+  // Sábana opcional: ocultar controles si no hay datos
+  if (!state.sabana || !state.sabana.length){
+    state.showSabana = false;
+    const tgsEl = qs("#toggleSabana"); if (tgsEl) tgsEl.style.display = "none";
+    const segEl = qs("#metricSeg"); if (segEl) segEl.style.display = "none";
+    const ptCtlEl = qs("#ptCtl"); if (ptCtlEl) ptCtlEl.style.display = "none";
+    const headH3 = qs(".maphead h3"); if (headH3) headH3.textContent = "Mapa (Sábana opcional)";
+    const meta = qs("#mapMeta"); if (meta) meta.textContent = "— (Sábana no cargada · opcional)";
+    const legend = qs("#mapLegend"); if (legend) legend.innerHTML = "";
+  }
+
+
+  // Toggle Sábana
+  const tgs = qs("#toggleSabana");
+  function updateSabanaToggleBtn(){
+    if (!tgs) return;
+    tgs.textContent = state.showSabana ? "Ocultar Sábana" : "Mostrar Sábana";
+    tgs.classList.toggle("active", state.showSabana);
+  }
+  if (tgs){
+    tgs.onclick = ()=>{
+      state.showSabana = !state.showSabana;
+      updateSabanaToggleBtn();
+      if (!state.showSabana){
+        if (state.sabanaLayer){ state.sabanaLayer.clearLayers(); if (state.map && state.map.hasLayer(state.sabanaLayer)) state.map.removeLayer(state.sabanaLayer); }
+        const legend = qs("#mapLegend"); if (legend) legend.innerHTML = "";
+        const meta = qs("#mapMeta"); if (meta) meta.textContent = "Sábana oculta";
+      } else {
+        if (state.map && state.sabanaLayer && !state.map.hasLayer(state.sabanaLayer)) state.sabanaLayer.addTo(state.map);
+        drawSabanaLayer();
+      }
+    };
+    updateSabanaToggleBtn();
+  }
+
+  // Métrica + tamaño punto
+  const seg=qs("#metricSeg");
+  seg.addEventListener("click", (e)=>{
+    const b=e.target.closest("button[data-m]"); if(!b) return;
+    qsa("#metricSeg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.sabanaMetric = b.dataset.m;
+    drawSabanaLayer(); // solo redibuja sabana
+  });
+  const pi = qs("#ptInput");
+  const applyPt = ()=>{ const v=parseInt(pi.value); state.sabanaRadius = (Number.isFinite(v)? Math.max(1, Math.min(9, v)) : 3); pi.value = String(state.sabanaRadius); drawSabanaLayer(); };
+  if (pi){ pi.addEventListener("change", applyPt); pi.addEventListener("keyup", (e)=>{ if(e.key==="Enter") applyPt(); }); }
+
+  // Map
+  initMap();
+  redrawAll();
+}
+
+
+/*** === GitHub Pages Auto Load ===
+ - Busca CSV en /data/:
+   Biometria.csv, Lances.csv, Capturas.csv, Sabana.csv (opcional)
+ - Si carga 3/4 o 4/4, oculta cargadores y llama initAfterData().
+ - En file:// (local), no intenta autoload para evitar CORS.
+***/
+const AUTO_URLS = {
+  biom: "data/Biometria.csv",
+  lan:  "data/Lances.csv",
+  cap:  "data/Capturas.csv",
+  sab:  "data/Sabana.csv" // opcional
+};
+
+async function fetchText(url){
+  try{
+    const r = await fetch(url, {cache:"no-store"});
+    if (!r.ok) throw new Error(String(r.status));
+    return await r.text();
+  } catch(e){ return null; }
+}
+
+async function autoLoadFromUrls(){
+  const [tBio, tLan, tCap, tSab] = await Promise.all([
+    fetchText(AUTO_URLS.biom),
+    fetchText(AUTO_URLS.lan),
+    fetchText(AUTO_URLS.cap),
+    fetchText(AUTO_URLS.sab)
+  ]);
+  let ok = true;
+
+  if (tLan){
+    Papa.parse(tLan, {header:true, worker:false, complete: res=>{
+      try{ state.lances = normalizeLances(res.data||[]); loaded.lan=true; }catch{}
+    }});
+  } else ok = false;
+
+  if (tBio){
+    Papa.parse(tBio, {header:true, worker:false, complete: res=>{
+      try{ state.biom   = normalizeBiom(res.data||[]);   loaded.bio=true; }catch{}
+    }});
+  } else ok = false;
+
+  if (tCap){
+    Papa.parse(tCap, {header:true, worker:false, complete: res=>{
+      try{ state.cap    = normalizeCap(res.data||[]);    loaded.cap=true; }catch{}
+    }});
+  } else ok = false;
+
+  if (tSab){
+    Papa.parse(tSab, {header:true, worker:false, complete: res=>{
+      try{ state.sabana = normalizeSabana(res.data||[]); loaded.sab=true; }catch{}
+    }});
+  }
+  return ok;
+}
+
+function hideUploaders(){
+  document.querySelectorAll(".uploader").forEach(x=> x.style.display="none");
+}
+
+async function bootAuto(){
+  try{
+    if (location.protocol === "file:"){ console.log("file:// -> autoload OFF"); return; }
+    const ok = await autoLoadFromUrls();
+    if (!ok){ console.log("Autoload: faltan CSV en /data"); return; }
+    // Espera micro-tick para que Papa complete sus callbacks
+    setTimeout(()=>{
+      const st = document.querySelector("#status");
+      const count = (loaded.lan?1:0)+(loaded.bio?1:0)+(loaded.cap?1:0)+(loaded.sab?1:0);
+      if (count>=3){ hideUploaders(); if (st) st.textContent = loaded.sab ? "Auto: /data precargado (4/4)" : "Auto: /data precargado (3/4 · sin Sábana)"; }
+      // init una sola vez
+      if (typeof initAfterData === "function"){ initAfterData(); }
+    }, 0);
+  } catch(e){ console.warn("bootAuto error", e); }
+}
+
+
+// === Default Bin by Species (auto) ===
+function applySpeciesDefaultBinFromName(name){
+  if (!name) return;
+  const s = String(name).toLowerCase();
+  let bin = null;
+  if (s.includes("jurel")) bin = 1;
+  else if (s.includes("sardina austral") || s.includes("sardina comun") || s.includes("anchoveta")) bin = 0.5;
+  else if (s.includes("merluza cola") || s.includes("merluza sur") || s.includes("m_cola") || s.includes("m_sur") || s.includes("cola") || s.includes("sur")) bin = 5;
+  if (bin != null){
+    const input = document.querySelector("#binInput");
+    if (input){ input.value = bin; }
+    state.binStep = bin;
+  }
+}
+
+/*** UI helpers ***/
+function updateSpeciesButtons(){
+  const sb = qs("#speciesBtns");
+  Array.from(sb.children).forEach(btn=>{
+    const on = (btn.textContent === (state.selectedSpecies||""));
+    btn.classList.toggle("active", on);
+  });
+}
+function updateLanceButtons(){
+  const ids=[...new Set(state.lances.map(d=>d.lance_id))];
+  const btns=Array.from(qs("#lanceBtns").children);
+  btns.forEach((b,i)=>{
+    const id=ids[i];
+    const on=state.selectedLances.has(id);
+    b.classList.toggle("active", on);
+    b.style.color = on? "#fff":"#cbd5e1";
+    b.style.background= on? "#334155": "#0b1226";
+  });
+  qs("#selCount").textContent = state.selectedLances.size + " sel.";
+}
+
+/*** Map ***/
+function initMap(){
+  if (state.map) return;
+  state.map = L.map("map", { zoomControl:true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ maxZoom:12, minZoom:3, attribution:"&copy; OpenStreetMap" }).addTo(state.map);
+  state.sabanaLayer=L.layerGroup().addTo(state.map);
+  state.lancesLayer=L.layerGroup().addTo(state.map);
+  state.map.setView([-44.1,-75.0],6);
+}
+
+function drawSabanaLayer(){
+  const layer = state.sabanaLayer; if (!layer) return;
+  layer.clearLayers();
+  const legend = qs("#mapLegend"); legend.innerHTML="";
+  if (!state.sabana?.length){ const __mm = qs("#mapMeta"); if (__mm) __mm.textContent = "— (carga la Sábana)"; return; }
+
+  const latlngs=[];
+  for (const r of state.sabana){
+    const lat=r._LatM, lon=r._LonM; if (!isFinite(lat)||!isFinite(lon)) continue;
+    let v = NaN, vname = "";
+    if (state.sabanaMetric==="NASC"){ v=r._NASC; vname="NASC_mezcla_MS.MC"; }
+    else if (state.sabanaMetric==="AUS"){ v=r._sA_Aus; vname="sA_Merluza_Austral"; }
+    else { v=r._sA_Cola; vname="sA_Merluza_Cola"; }
+    const col = classColor(v);
+    const marker=L.circleMarker([lat,lon],{radius:state.sabanaRadius,color:col,fillColor:col,fillOpacity:0.95,weight:1});
+    latlngs.push([lat,lon]);
+    const vtxt = (isFinite(v)? fmt1d(v) : "N/A");
+    const ubm = (r._UBM!=null && isFinite(r._UBM)) ? String(r._UBM) : "N/A";
+    marker.bindPopup(`UBM: <b>${ubm}</b><br>${vname}: <b>${vtxt}</b><br>Lat: ${lat.toFixed(5)}, Lon: ${lon.toFixed(5)}`);
+    marker.addTo(layer);
+  }
+  if (!state.mapFitted && latlngs.length){
+    state.map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+    state.mapFitted=true;
+  }
+
+  // Legend
+  const items=[
+    {c:COLORS.gray,  t:"N/A o 0"},
+    {c:COLORS.yellow,t:"1–640"},
+    {c:COLORS.green, t:"641–1280"},
+    {c:COLORS.blue,  t:"1281–2560"},
+    {c:COLORS.red,   t:">2560"}
+  ];
+  for (const it of items){
+    const div=document.createElement("div"); div.className="key"; div.innerHTML=`<span class="sw" style="background:${it.c}"></span> ${it.t}`; if (legend) legend.appendChild(div);
+  }
+  const __mm = qs("#mapMeta"); if (__mm) __mm.textContent = `${latlngs.length} puntos · métrica: ${state.sabanaMetric}`;
+}
+
+function drawLancesLayer(selSet){
+  const layer = state.lancesLayer; if (!layer) return;
+  layer.clearLayers();
+  if (!state.lances?.length) return;
+  const selected = state.lances.filter(d=> (!selSet || selSet.size===0 || selSet.has(d.lance_id)) && isFinite(d.lat) && isFinite(d.lon));
+  for (const row of selected){
+    const id=row.lance_id, lat=row.lat, lon=row.lon;
+    const c=lanceColor(id);
+    const marker=L.circleMarker([lat,lon],{radius:6,color:"#ffffff",weight:2,fillColor:c,fillOpacity:0.9});
+    const fecha = row.fecha || "";
+    marker.bindPopup(`<b>Lance ${id}</b><br>Fecha: ${fecha || "—"}<br>Lat: ${(lat).toFixed(5)}, Lon: ${(lon).toFixed(5)}`);
+    marker.bindTooltip(String(id), {permanent:true, direction:"top", offset:[0,-8], className:"lance-tip"});
+    marker.addTo(layer);
+  }
+}
+
+function drawMap(selSet){
+  if (state.showSabana && (!state.sabana || !state.sabana.length)) { state.showSabana=false; const t=qs("#toggleSabana"); if(t){ t.classList.remove("active"); t.textContent="Mostrar Sábana"; } }
+  if (state.showSabana){
+    if (state.map && state.sabanaLayer && !state.map.hasLayer(state.sabanaLayer)) state.sabanaLayer.addTo(state.map);
+    drawSabanaLayer();
+  } else {
+    if (state.sabanaLayer){ state.sabanaLayer.clearLayers(); if (state.map && state.map.hasLayer(state.sabanaLayer)) state.map.removeLayer(state.sabanaLayer); }
+    const legend = qs('#mapLegend'); if (legend) legend.innerHTML='';
+    const meta = qs('#mapMeta'); if (meta) meta.textContent='Sábana oculta';
+  }
+  drawLancesLayer(selSet);
+}
+
+/*** Charts (no cambios) ***/
+
+function ensureChart(sel, type, cfg){
+  const el = qs(sel);
+  if (!el) return;
+  const ctx = el.getContext("2d");
+  const ch = state.charts[sel];
+  if (!ch){
+    state.charts[sel] = new Chart(ctx, Object.assign({type}, cfg));
+    return state.charts[sel];
+  }
+  // If type changed, destroy and recreate
+  if (ch.config && ch.config.type !== type){
+    ch.destroy();
+    state.charts[sel] = new Chart(ctx, Object.assign({type}, cfg));
+    return state.charts[sel];
+  }
+  // Otherwise, update in place
+  ch.data = cfg.data;
+  ch.options = cfg.options || ch.options;
+  ch.update();
+  return ch;
+}
+const commonScales = {
+  x:{ title:{display:true}, ticks:{ color:"#cbd5e1", font:{size:12} }, grid:{ color:"#243044" } },
+  y:{ title:{display:true}, ticks:{ color:"#cbd5e1", font:{size:12} }, grid:{ color:"#243044" } }
+};
+const commonPlugins = { legend:{labels:{color:"#cbd5e1"}}, tooltip:{titleColor:"#e6edf3", bodyColor:"#e6edf3"} };
+function niceBins(min, max, step=1){ const bins=[]; const start=Math.floor(min/step)*step; const end=Math.ceil(max/step)*step; for(let x=start;x<=end;x+=step) bins.push(x); return bins; }
+function linReg(x, y){
+  const n=x.length,sx=x.reduce((a,b)=>a+b,0), sy=y.reduce((a,b)=>a+b,0);
+  const sxx=x.reduce((a,b)=>a+b*b,0), sxy=x.reduce((a,b,i)=>a+b*y[i],0);
+  const denom = (n*sxx - sx*sx); if (!denom) return null;
+  const b=(n*sxy - sx*sy)/denom, a=(sy - b*sx)/n;
+  const yhat=x.map(xi=>a+b*xi), ssRes=y.reduce((acc,yi,i)=>acc+Math.pow(yi-yhat[i],2),0);
+  const yMean=sy/n, ssTot=y.reduce((acc,yi)=>acc+Math.pow(yi-yMean,2),0);
+  const r2= 1 - (ssRes/ssTot);
+  return {a,b,r2};
+}
+function potReg(x,y){
+  const lx=[],ly=[]; for(let i=0;i<x.length;i++){ if (x[i]>0 && y[i]>0){ lx.push(Math.log(x[i])); ly.push(Math.log(y[i])); } }
+  if (lx.length<2) return null; const lr=linReg(lx,ly); if (!lr) return null;
+  return {A: Math.exp(lr.a), B: lr.b, r2: lr.r2};
+}
+
+
+
+function drawFreq(rows, spec){
+  const key = "#freqChart";
+
+  const empty = ()=>{
+    ensureChart(key, (state.freqMode==='bar'?'bar':'line'), {
+      data:{ labels:[], datasets:[] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{...commonPlugins, legend:{display: state.freqMode==='bar'}} }
+    });
+    qs("#freqMeta").textContent="—";
+  };
+
+  if (!rows || !rows.length){ empty(); return; }
+
+  const dataRows = rows.filter(r=> Number.isFinite(r.longitud_cm));
+  if (!dataRows.length){ empty(); return; }
+
+  // Stats
+  const xs = dataRows.map(r=> r.longitud_cm);
+  const n = xs.length;
+  const mean = xs.reduce((a,b)=>a+b,0)/n;
+  const sd = Math.sqrt(xs.reduce((a,b)=>a+Math.pow(b-mean,2),0)/n);
+  const sorted=[...xs].sort((a,b)=>a-b);
+  const p50 = sorted[Math.floor(0.5*(sorted.length-1))];
+  const p95 = sorted[Math.floor(0.95*(sorted.length-1))];
+
+  // Rango por especie (usa límites conocidos si aplica)
+  let xmin=Math.min(...xs), xmax=Math.max(...xs);
+  if (/M(erluza)?[_\s]*Sur/i.test(spec)) { xmin=15; xmax=125; }
+  else if (/M(erluza)?[_\s]*Cola/i.test(spec)) { xmin=15; xmax=125; }
+  else if (/Sardina|Anchoveta/i.test(spec)) { xmin=5; xmax=25; }
+  else if (/Jurel/i.test(spec)) { xmin=10; xmax=70; }
+
+  const step = Math.max(0.1, Number(state.binStep)||5);
+  const startV = Math.floor(xmin/step)*step;
+  const endV = Math.ceil(xmax/step)*step + 1e-9;
+  const bins = [];
+  for (let v=startV; v<=endV; v+=step){ bins.push(v); }
+  const labels = bins.slice(0,-1).map((b,i)=> `${Math.round(b)}-${Math.round(bins[i+1])}`);
+
+  // ¿Multi por lances?
+  const lanceIds = [...new Set(dataRows.map(r=> r.lance_id))].sort((a,b)=>a-b);
+  const isMulti = state.multi && lanceIds.length>1;
+
+  if (isMulti){
+    const color = (i)=> `hsl(${(i*67)%360} 85% 60%)`;
+    const datasets = lanceIds.map((id, i)=>{
+      const counts = new Array(bins.length-1).fill(0);
+      for (const r of dataRows){
+        if (r.lance_id !== id) continue;
+        const v = r.longitud_cm;
+        let idx = Math.floor((v - bins[0]) / step);
+        idx = Math.max(0, Math.min(counts.length-1, idx));
+        counts[idx]++;
+      }
+      const c = color(i);
+      return { label:`Lance ${id}`, data:counts, tension:0.25, fill:false, borderColor:c, backgroundColor:c, pointRadius:2, borderWidth:2 };
+    });
+
+    ensureChart(key,"line",{
+      data:{ labels, datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ 
+          x:{...commonScales.x, title:{display:true, text:"Talla (cm)"}},
+          y:{...commonScales.y, title:{display:true, text:"Frecuencia"}, beginAtZero:true}
+        },
+        plugins:{ ...commonPlugins, legend:{position:"bottom"}, title:{display:true, text:`${spec||"Frecuencia"} — Lances ${lanceIds.join(", ")}`, color:"#cbd5e1"} }
+      }
+    });
+  } else if (state.freqMode === 'bar'){
+    // Barras apiladas por sexo
+    const cM = new Array(bins.length-1).fill(0);
+    const cH = new Array(bins.length-1).fill(0);
+    for (const r of dataRows){
+      const v = r.longitud_cm;
+      let idx = Math.floor((v - bins[0]) / step);
+      idx = Math.max(0, Math.min(cM.length-1, idx));
+      if (r.sexo===1) cM[idx]++;
+      else if (r.sexo===2) cH[idx]++;
+    }
+    ensureChart(key, "bar", {
+      data:{ labels, datasets:[
+        { label:"Machos (1)", data:cM, stack:"sexo", borderWidth:0 },
+        { label:"Hembras (2)", data:cH, stack:"sexo", borderWidth:0 }
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{
+          x:{...commonScales.x, title:{display:true, text:"Talla (cm)"}, stacked:true},
+          y:{...commonScales.y, title:{display:true, text:"Frecuencia"}, beginAtZero:true, stacked:true}
+        },
+        plugins:{ ...commonPlugins, legend:{position:"bottom"} }
+      }
+    });
+  } else {
+    // Línea única (total)
+    const counts = new Array(bins.length-1).fill(0);
+    for (const v of xs){
+      let idx = Math.floor((v - bins[0]) / step);
+      idx = Math.max(0, Math.min(counts.length-1, idx));
+      counts[idx]++;
+    }
+    ensureChart(key,"line",{
+      data:{ labels, datasets:[{ data: counts, tension:0.2, fill:false, borderWidth:2, pointRadius:0 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        scales:{ 
+          x:{...commonScales.x, title:{display:true, text:"Talla (cm)"}}, 
+          y:{...commonScales.y, title:{display:true, text:"Frecuencia"}, beginAtZero:true} 
+        },
+        plugins:{ ...commonPlugins, legend:{display:false} }
+      }
+    });
+  }
+
+  qs("#freqMeta").textContent = `n=${fmt1(n)} · ⌀=${fmt1d(mean)} cm · σ=${fmt1d(sd)} · P50=${fmt1d(p50)} · P95=${fmt1d(p95)}`;
+}
+
+function drawScatter(rows, spec){
+  // Puntos válidos
+  const pts = (rows||[])
+    .map(r=>({x:r.longitud_cm, y:r.peso_g}))
+    .filter(p=> isFinite(p.x) && isFinite(p.y));
+  if (!pts.length){
+    ensureChart("#scatterChart","scatter",{
+      data:{datasets:[]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:"bottom"}}}
+    });
+    qs("#regMeta").textContent="—";
+    return;
+  }
+
+  // Rango X igual al de Frecuencia
+  const x = pts.map(p=>p.x), y=pts.map(p=>p.y);
+  let xmin=Math.min(...x), xmax=Math.max(...x);
+  if (/M_Sur/i.test(spec) || /M_Cola/i.test(spec)) { xmin=15; xmax=125; }
+  else if (/Sardina|Anchoveta/i.test(spec)) { xmin=5; xmax=25; }
+  else if (/Jurel/i.test(spec)) { xmin=10; xmax=70; }
+
+  // Series por sexo
+  const ptsM = (rows||[]).filter(r=> isFinite(r.longitud_cm) && isFinite(r.peso_g) && r.sexo===1)
+    .map(r=>({x:r.longitud_cm, y:r.peso_g}));
+  const ptsH = (rows||[]).filter(r=> isFinite(r.longitud_cm) && isFinite(r.peso_g) && r.sexo===2)
+    .map(r=>({x:r.longitud_cm, y:r.peso_g}));
+  const ptsI = (rows||[]).filter(r=> isFinite(r.longitud_cm) && isFinite(r.peso_g) && r.sexo!==1 && r.sexo!==2)
+    .map(r=>({x:r.longitud_cm, y:r.peso_g}));
+
+  // Regresión potencial con todos los puntos
+  const pr = (x.length>1)? potReg(x,y) : null;
+  let regLine=[];
+  if (pr){
+    const xMin=xmin, xMax=xmax;
+    const xx=[]; for(let t=0;t<40;t++) xx.push(xMin + (xMax-xMin)*t/39);
+    regLine = xx.map(xv=>({x:xv, y: pr.A * Math.pow(xv, pr.B)}));
+    // v2.8.3+ usa A(4), B(2), R²(3)
+    qs("#regMeta").textContent = `y = ${fmt4d(pr.A)} · x^${fmt2d(pr.B)}  ·  R²=${fmt3d(pr.r2)}`;
+  } else {
+    qs("#regMeta").innerHTML = `<span style="color:#f59e0b">Insuficiente para regresión</span>`;
+  }
+
+  const datasets = [
+    {label:"Machos (1)", data:ptsM, pointRadius:1.8, showLine:false, backgroundColor:"#3b82f6", borderColor:"#3b82f6"},
+    {label:"Hembras (2)", data:ptsH, pointRadius:1.8, showLine:false, backgroundColor:"#ec4899", borderColor:"#ec4899"},
+    {label:"Indet.", data:ptsI, pointRadius:1.8, showLine:false, backgroundColor:"#94a3b8", borderColor:"#94a3b8"}
+  ];
+  if (regLine.length) datasets.push({label:"Tendencia (potencial)", data:regLine, type:"line", borderColor:"#fbbf24", backgroundColor:"#fbbf24", borderWidth:2.5, pointRadius:0, fill:false, tension:0});
+
+  ensureChart("#scatterChart","scatter",{
+    data:{ datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{ x:{...commonScales.x, title:{display:true, text:"Longitud (cm)"}, min:xmin, max:xmax},
+               y:{...commonScales.y, title:{display:true, text:"Peso (g)"}, beginAtZero:true} },
+      plugins:{ ...commonPlugins, legend:{position:"bottom"} }
+    }
+  });
+}
+
+
+function especieBucket(name){
+  const s = String(name||"").toLowerCase();
+  if (/cola/.test(s)) return "M_Cola";
+  if (/sur/.test(s)) return "M_Sur";
+  return "Otros";
+}
+function renderCapTable(rows){
+  const totals = { "M_Sur":0, "M_Cola":0, "Otros":0 };
+  for (const r of (rows||[])){
+    const kg = Number(r.captura_kg);
+    if (Number.isFinite(kg)){
+      totals[especieBucket(r.especie)] += kg;
+    }
+  }
+  const wrap = qs("#capTableWrap");
+  if (!wrap) return;
+  const fmt = (x)=> (x||0).toLocaleString(undefined, {maximumFractionDigits:0});
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Especie</th><th>Kilos</th></tr></thead>
+    <tbody>
+      <tr><td>M_Sur</td><td>${fmt(totals["M_Sur"])}</td></tr>
+      <tr><td>M_Cola</td><td>${fmt(totals["M_Cola"])}</td></tr>
+      <tr><td>Otros</td><td>${fmt(totals["Otros"])}</td></tr>
+    </tbody>
+  </table>`;
+}
+
+
+
+function drawCapturas(rows){
+  // Detectar cantidad de lances en la selección
+  const lanceIds = Array.from(new Set((rows||[]).map(r=> r.lance_id))).sort((a,b)=> a-b);
+
+  // Helper: bucket de especie a 3 grupos
+  const buck = (name)=>{
+    const s = String(name||"").toLowerCase();
+    if (s.includes("cola")) return "M_Cola";
+    if (s.includes("sur")) return "M_Sur";
+    return "Otros";
+  };
+
+  if (lanceIds.length <= 1){
+    // ----- Caso 1 lance: DONUT por especie -----
+    const totals = {};
+    for (const r of (rows||[])){
+      const kg = Number(r.captura_kg);
+      if (!Number.isFinite(kg)) continue;
+      const k = buck(r.especie);
+      totals[k] = (totals[k]||0) + kg;
+    }
+    const labels = Object.keys(totals);
+    const data = labels.map(k=> totals[k]);
+    const sum = data.reduce((a,b)=> a+b, 0);
+
+    ensureChart("#capChart","doughnut",{
+      data:{ labels, datasets:[{ 
+        data,
+        backgroundColor: labels.map(k=> ({ "M_Sur":"#ec4899", "M_Cola":"#3b82f6", "Otros":"#fbbf24" }[k] || "#94a3b8"))
+      }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{position:"bottom", labels:{ color:"#cbd5e1" } },
+          tooltip:{ callbacks:{ label: (ctx)=> `${ctx.label}: ${fmt1(ctx.parsed)} kg${sum? ` (${fmt2d(100*ctx.parsed/sum)}%)`:""}` } }
+        }
+      }
+    });
+    const meta = qs("#capMeta"); if (meta) meta.textContent = `Total: ${fmt1(sum)} kg`;
+    return;
+  }
+
+  // ----- Caso multi-lance: BARRAS APILADAS 100% -----
+  // Ejes: X = Lance, Series = 3 especies, Valores = % (normalizado a 100)
+  const species = ["M_Sur","M_Cola","Otros"];
+  const colorMap = {"M_Sur":"#ec4899","M_Cola":"#3b82f6","Otros":"#fbbf24"};
+
+  // Matriz kg[lance][species]
+  const kg = {};
+  for (const id of lanceIds) kg[id] = { "M_Sur":0, "M_Cola":0, "Otros":0 };
+  for (const r of (rows||[])){
+    const id = r.lance_id;
+    if (!kg[id]) continue;
+    const sp = buck(r.especie);
+    const v = Number(r.captura_kg);
+    if (Number.isFinite(v)) kg[id][sp] += v;
+  }
+
+  // Normalizar a porcentajes por lance
+  const labels = lanceIds.map(id => `L${id}`);
+  const sumByLance = lanceIds.map(id => kg[id]["M_Sur"] + kg[id]["M_Cola"] + kg[id]["Otros"]);
+  const ds = species.map(sp => ({
+    label: sp,
+    data: lanceIds.map((id, i) => {
+      const tot = sumByLance[i] || 0;
+      const val = kg[id][sp];
+      return tot ? (100 * val / tot) : 0;
+    }),
+    backgroundColor: colorMap[sp],
+    borderWidth: 0
+  }));
+
+  ensureChart("#capChart","bar",{
+    data:{ labels, datasets: ds },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ stacked:true, ticks:{ color:"#cbd5e1" }, grid:{ color:"rgba(148,163,184,0.15)" }},
+        y:{ stacked:true, beginAtZero:true, max:100, ticks:{ callback:(v)=> v+"%", color:"#cbd5e1" }, grid:{ color:"rgba(148,163,184,0.15)" }}
+      },
+      plugins:{
+        legend:{ position:"bottom", labels:{ color:"#cbd5e1" } },
+        tooltip:{
+          callbacks:{
+            label: (ctx)=>{
+              const i = ctx.dataIndex;
+              const id = lanceIds[i];
+              const sp = ctx.dataset.label;
+              const pct = ctx.parsed.y || 0;
+              const kgVal = kg[id][sp] || 0;
+              return `${sp}: ${fmt1(kgVal)} kg (${fmt2d(pct)}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const totalKg = sumByLance.reduce((a,b)=>a+b,0);
+  const meta = qs("#capMeta"); if (meta) meta.textContent = `Total: ${fmt1(totalKg)} kg · ${lanceIds.length} lances`;
+}
+
+
+function drawSexo(rows){
+  let m=0,h=0,i=0; for (const r of (rows||[])){ if (r.sexo===1) m++; else if (r.sexo===2) h++; else i++; }
+  const labels=["Machos (1)","Hembras (2)","Indet."], data=[m,h,i];
+  const n=m+h+i || 1;
+  ensureChart("#sexChart","doughnut",{
+    data:{ labels, datasets:[{ data }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:"bottom", labels:{ color:"#cbd5e1" } },
+        tooltip:{ callbacks:{ label: ctx => `${ctx.label}: ${fmt1(ctx.parsed)} (${fmt2d(100*ctx.parsed/n)}%)` } }
+      }
+    }
+  });
+  qs("#sexMeta").textContent = `n=${fmt1(n)}  ·  ♂ ${fmt2d(100*(m/(n||1)))}%  ·  ♀ ${fmt2d(100*(h/(n||1)))}%`;
+}
+
+
+function drawEMS(rows){
+  // Contar EMS de hembras (sexo===2), válido 1–5
+  const counts = [0,0,0,0,0];
+  let n = 0;
+  for (const r of (rows||[])){
+    const sx = Number(r.sexo);
+    const val = Number(r.Ems);
+    if (sx===2 && Number.isFinite(val)){
+      const k = Math.round(val);
+      if (k>=1 && k<=5){ counts[k-1]++; n++; }
+    }
+  }
+  const labels = ["1","2","3","4","5"];
+  ensureChart("#emsChart","bar",{
+    data:{ labels, datasets:[{ data: counts }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{...commonScales.x, title:{display:true, text:"EMS (hembras)"} },
+        y:{...commonScales.y, title:{display:true, text:"n"}, beginAtZero:true}
+      },
+      plugins:{ ...commonPlugins, legend:{display:false}, tooltip:{callbacks:{ label: ctx => `EMS ${ctx.label}: ${ctx.parsed.y}`}} }
+    }
+  });
+  const meta = qs("#emsMeta"); if (meta) meta.textContent = n? `n=${n}` : "—";
+}
+
+/*** Redraw orchestrator ***/
+function redrawAll(){
+  const ids = state.selectedLances.size? [...state.selectedLances] : [...new Set((state.lances||[]).map(d=>d.lance_id))];
+  const sel = new Set(ids);
+  const spec = state.selectedSpecies;
+
+  drawMap(sel); // sabana stays, lances reflect sel
+
+  const bio = (state.biom||[]).filter(d=> sel.has(d.lance_id) && (!spec || d.especie===spec) && isFinite(d.longitud_cm));
+  drawFreq(bio, spec||"");
+  const bio2 = bio.filter(d=> isFinite(d.peso_g));
+  drawScatter(bio2, spec||"");
+
+  const cap = (state.cap||[]).filter(d=> sel.has(d.lance_id) && isFinite(d.captura_kg));
+  drawCapturas(cap);
+
+  drawSexo(bio);
+  drawEMS(bio);
+}
+
+/*** Inputs ***/
+function markReady(el){ el.classList.add("ready"); }
+function parseCSV(file, preferredDelimiter, cb){
+  function autoParse(next){
+    Papa.parse(file, { header:true, dynamicTyping:false, skipEmptyLines:true, complete: res => next(null,res), error: err=>next(err,null) });
+  }
+  function reparse(delim, next){
+    Papa.parse(file, { header:true, dynamicTyping:false, skipEmptyLines:true, delimiter:delim, complete: res => next(null,res), error: err=>next(err,null) });
+  }
+  autoParse((err, res)=>{
+    if (err){ console.error("Papa auto error", err); if (preferredDelimiter) return reparse(preferredDelimiter, (e2,r2)=> cb(e2,r2)); return cb(err,null); }
+    const cols = res.meta?.fields || [];
+    if (cols.length===1){
+      const header = cols[0]||"";
+      if (header.includes(";") || preferredDelimiter === ";"){
+        return reparse(";", (e2,r2)=> cb(e2||null, r2||res));
+      }
+      if (preferredDelimiter === ","){
+        return reparse(",", (e2,r2)=> cb(e2||null, r2||res));
+      }
+    }
+    cb(null,res);
+  });
+}
+
+
+qs("#fileSabana").addEventListener("change", e=>{
+  const f=e.target.files[0]; if (!f) return;
+  parseCSV(f, ",", (err, res)=>{
+    if (err||!res){ qs("#status").textContent="❌ Error Sábana"; console.error(err); return; }
+    state.sabana = normalizeSabana(res.data||[]);
+    loaded.sab = true;
+    state.mapFitted=false;
+    // Re-mostrar controles de Sábana
+    const tgsEl = qs("#toggleSabana"); if (tgsEl){ tgsEl.style.display=""; }
+    const segEl = qs("#metricSeg"); if (segEl){ segEl.style.display=""; }
+    const ptCtlEl = qs("#ptCtl"); if (ptCtlEl){ ptCtlEl.style.display=""; }
+    const headH3 = qs(".maphead h3"); if (headH3){ headH3.textContent = "Mapa Sábana (Lat_M/Lon_M)"; }
+    // Activar la capa y actualizar botón
+    state.showSabana = true;
+    const btn = qs("#toggleSabana");
+    if (typeof updateSabanaToggleBtn === "function"){ updateSabanaToggleBtn(); }
+    else if (btn){ btn.classList.add("active"); btn.textContent="Ocultar Sábana"; }
+    // Estado y re-dibujo
+    markReady(e.target.parentElement);
+    setStatus();
+    drawMap(state.selectedLances || new Set());
+  });
+});
+
+qs("#fileLances").addEventListener("change", e=>{
+  const f=e.target.files[0]; if (!f) return;
+  parseCSV(f, ";", (err, res)=>{
+    if (err||!res){ qs("#status").textContent="❌ Error Lances"; console.error(err); return; }
+    state.lances = normalizeLances(res.data||[]);
+    loaded.lan = true; markReady(e.target.parentElement); setStatus();
+    redrawAll();
+  });
+});
+qs("#fileBiom").addEventListener("change", e=>{
+  const f=e.target.files[0]; if (!f) return;
+  parseCSV(f, ";", (err, res)=>{
+    if (err||!res){ qs("#status").textContent="❌ Error Biometría"; console.error(err); return; }
+    state.biom = normalizeBiom(res.data||[]);
+    loaded.bio = true; markReady(e.target.parentElement); setStatus();
+    redrawAll();
+  });
+});
+qs("#fileCap").addEventListener("change", e=>{
+  const f=e.target.files[0]; if (!f) return;
+  parseCSV(f, ";", (err, res)=>{
+    if (err||!res){ qs("#status").textContent="❌ Error Capturas"; console.error(err); return; }
+    state.cap = normalizeCap(res.data||[]);
+    loaded.cap = true; markReady(e.target.parentElement); setStatus();
+    redrawAll();
+  });
+});
+</script>
+
+<div id="helpModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal" role="document">
+    <header>
+      <h2>Guía rápida · Archivos y columnas</h2>
+      <button id="btnCloseHelp" class="btn ghost small">✕</button>
+    </header>
+    <div class="content">
+  <div class="content">
+    <p style="margin:0 0 10px 0;color:#9fb1c5">Guía compacta para preparar los 4 CSV. Puedes descargar plantillas al final.</p>
+
+    <div class="cols">
+      <div>
+        <h3 style="margin-top:0">Archivos admitidos (4 CSV)</h3>
+        <ul>
+          <li>📄 <b>Sábana</b> — puntos (Lat/Lon) + métricas (NASC, sA)</li>
+          <li>🧭 <b>Lances</b> — ID de lance, fecha (opcional) y posición</li>
+          <li>🪪 <b>Biometría</b> — especie, longitud (cm), peso (g), sexo, EMS</li>
+          <li>🎣 <b>Capturas</b> — especie, captura (kg)</li>
+        </ul>
+        <p class="code light">Delimitador: auto (, o ;) · Codificación: UTF‑8</p>
+        <p><b>Consejo:</b> mantén <u>los mismos nombres</u> de columna/ especie entre archivos para evitar errores.</p>
+      </div>
+
+      <div>
+        <h3 style="margin-top:0">Columnas mínimas</h3>
+        <ul>
+          <li><b>Sábana:</b> <span class="code">Lance</span>, <span class="code">Lat_M</span>, <span class="code">Lon_M</span>, y al menos una métrica: <span class="code">NASC_mezcla_MS.MC</span>, <span class="code">sA_Merluza_Austral</span> o <span class="code">sA_Merluza_Cola</span></li>
+          <li><b>Lances:</b> <span class="code">lance_id</span>, <span class="code">Lat_M</span>/<span class="code">Lat</span>, <span class="code">Lon_M</span>/<span class="code">Lon</span> (opcional: <span class="code">Fecha</span>)</li>
+          <li><b>Biometría:</b> <span class="code">lance_id</span>, <span class="code">especie</span>, <span class="code">longitud_cm</span> (opcional: <span class="code">peso_g</span>, <span class="code">sexo</span>, <span class="code">Ems</span>)</li>
+          <li><b>Capturas:</b> <span class="code">lance_id</span>, <span class="code">especie</span>, <span class="code">captura_k</span></li>
+        </ul>
+
+        <details class="lite">
+          <summary>Ver sinónimos aceptados</summary>
+          <div class="syns">
+            <p><b>Sábana:</b> <span class="code">Lance | lance | ID_Lance | id_lance</span> · <span class="code">Lat_M | lat_m | Lat M</span> · <span class="code">Lon_M | lon_m | Lon M</span> · métricas: <span class="code">NASC_mezcla_MS.MC | NASC_mezcla_MS_MC | NASC | nasc</span>, <span class="code">sA_Merluza_Austral | sA_Merluza_Aus | sA_Austral</span>, <span class="code">sA_Merluza_Cola | sA_Cola</span></p>
+            <p><b>Lances:</b> <span class="code">lance_id | Lance | ID_Lance | id_lance</span> · <span class="code">Fecha</span> · <span class="code">Lat_M | Lat</span> · <span class="code">Lon_M | Lon</span></p>
+            <p><b>Biometría:</b> <span class="code">longitud_cm | long_cm | longitud</span> · <span class="code">peso_g | peso</span> · <span class="code">sexo</span> · <span class="code">Ems | ems</span></p>
+            <p><b>Capturas:</b> <span class="code">captura_k | captura</span></p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+</div>
+    <div class="footer">
+      <button id="btnTplSab" class="btn small">Descargar plantilla Sábana</button>
+      <button id="btnTplLans" class="btn small">Plantilla Lances</button>
+      <button id="btnTplBiom" class="btn small">Plantilla Biometría</button>
+      <button id="btnTplCap" class="btn small">Plantilla Capturas</button>
+      <button id="btnCloseFooter" class="btn ghost small">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+// --- Help modal + CSV templates ---
+(function(){
+  function ready(fn){ if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  ready(function(){
+    var modal = document.getElementById("helpModal");
+    var openBtn = document.getElementById("btnHelp");
+    var closeBtn = document.getElementById("btnCloseHelp");
+    var closeFoot = document.getElementById("btnCloseFooter");
+    function show(){ if(modal){ modal.style.display="flex"; modal.setAttribute("aria-hidden","false"); } }
+    function hide(){ if(modal){ modal.style.display="none"; modal.setAttribute("aria-hidden","true"); } }
+    if(openBtn) openBtn.addEventListener("click", show);
+    if(closeBtn) closeBtn.addEventListener("click", hide);
+    if(closeFoot) closeFoot.addEventListener("click", hide);
+    if(modal) modal.addEventListener("click", function(e){ if(e.target===modal) hide(); });
+    function dl(name, text){
+      var blob = new Blob([text], {type:"text/csv;charset=utf-8"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a"); a.href = url; a.download = name; a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    }
+    var b1 = document.getElementById("btnTplSab"); if(b1) b1.addEventListener("click", function(){ dl("plantilla_sabana.csv", "Lance,Lat_M,Lon_M,NASC_mezcla_MS.MC,sA_Merluza_Austral,sA_Merluza_Cola,UBM\n"); });
+    var b2 = document.getElementById("btnTplLans"); if(b2) b2.addEventListener("click", function(){ dl("plantilla_lances.csv", "lance_id,Fecha,Lat_M,Lon_M\n"); });
+    var b3 = document.getElementById("btnTplBiom"); if(b3) b3.addEventListener("click", function(){ dl("plantilla_biometria.csv", "lance_id,especie,longitud_cm,peso_g,sexo,Ems\n"); });
+    var b4 = document.getElementById("btnTplCap"); if(b4) b4.addEventListener("click", function(){ dl("plantilla_capturas.csv", "lance_id,especie,captura_k\n"); });
+  });
+})();
+</script>
+
+<script>document.addEventListener("DOMContentLoaded",()=>{ try{ bootAuto(); }catch(e){} });</script>
+</body>
+</html>
